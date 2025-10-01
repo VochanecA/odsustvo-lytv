@@ -1,0 +1,495 @@
+-- Employees table
+create table employees (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users,
+  first_name text not null,
+  last_name text not null,
+  email text not null,
+  work_group integer default 1,
+  created_at timestamp with time zone default timezone('utc'::text, now()),
+  updated_at timestamp with time zone default timezone('utc'::text, now())
+);
+
+-- Work groups table
+create table work_groups (
+  id integer primary key,
+  name text not null,
+  start_time time not null,
+  end_time time not null,
+  has_rest_day boolean default false
+);
+
+-- Absence types table
+create table absence_types (
+  id text primary key,
+  name text not null,
+  color text not null,
+  is_active boolean default true
+);
+
+-- Absence records table
+create table absence_records (
+  id uuid primary key default gen_random_uuid(),
+  employee_id uuid references employees,
+  absence_type_id text references absence_types,
+  date date not null,
+  hours numeric default 8,
+  status text default 'pending',
+  created_at timestamp with time zone default timezone('utc'::text, now()),
+  unique(employee_id, date)
+);
+
+-- Absence requests table
+create table absence_requests (
+  id uuid primary key default gen_random_uuid(),
+  employee_id uuid references employees,
+  absence_type_id text references absence_types,
+  start_date date not null,
+  end_date date not null,
+  reason text,
+  status text default 'pending',
+  created_at timestamp with time zone default timezone('utc'::text, now())
+);
+
+
+---nova baza:-- Enable UUID extension
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- Employees table
+CREATE TABLE employees (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES auth.users NOT NULL,
+  first_name TEXT NOT NULL,
+  last_name TEXT NOT NULL,
+  email TEXT NOT NULL,
+  work_group INTEGER DEFAULT 1,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(user_id)
+);
+
+-- User roles table
+CREATE TABLE user_roles (
+  user_id UUID REFERENCES auth.users PRIMARY KEY,
+  role TEXT NOT NULL DEFAULT 'user',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Work groups table
+CREATE TABLE work_groups (
+  id INTEGER PRIMARY KEY,
+  name TEXT NOT NULL,
+  start_time TIME NOT NULL,
+  end_time TIME NOT NULL,
+  has_rest_day BOOLEAN DEFAULT false
+);
+
+-- Absence types table
+CREATE TABLE absence_types (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  color TEXT NOT NULL,
+  is_active BOOLEAN DEFAULT true
+);
+
+-- Absence records table
+CREATE TABLE absence_records (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  employee_id UUID REFERENCES employees NOT NULL,
+  absence_type_id TEXT REFERENCES absence_types NOT NULL,
+  date DATE NOT NULL,
+  hours NUMERIC DEFAULT 8,
+  status TEXT DEFAULT 'approved',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(employee_id, date)
+);
+
+-- Insert default work groups
+INSERT INTO work_groups (id, name, start_time, end_time, has_rest_day) VALUES
+(1, 'Grupa 1', '07:00', '15:00', false),
+(2, 'Grupa 2', '07:00', '20:00', true);
+
+-- Insert default absence types
+INSERT INTO absence_types (id, name, color) VALUES
+('V', 'Godišnji odmor', '#10B981'),
+('S', 'Slobodan dan', '#8B5CF6'),
+('B', 'Bolovanje', '#EF4444'),
+('D', 'Smrtni slučaj u porodici', '#6B7280'),
+('C', 'Vjerski praznik', '#F59E0B');
+
+-- Enable RLS
+ALTER TABLE employees ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_roles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE absence_records ENABLE ROW LEVEL SECURITY;
+ALTER TABLE work_groups ENABLE ROW LEVEL SECURITY;
+ALTER TABLE absence_types ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies
+CREATE POLICY "Users can view own employee data" ON employees
+  FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Admins can view all employees" ON employees
+  FOR SELECT USING (
+    EXISTS (SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role = 'admin')
+  );
+
+CREATE POLICY "Users can insert own employee data" ON employees
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can view own role" ON user_roles
+  FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Admins can view all roles" ON user_roles
+  FOR SELECT USING (
+    EXISTS (SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role = 'admin')
+  );
+
+CREATE POLICY "Users can view own absence records" ON absence_records
+  FOR SELECT USING (
+    employee_id IN (SELECT id FROM employees WHERE user_id = auth.uid())
+  );
+
+CREATE POLICY "Admins can manage all absence records" ON absence_records
+  FOR ALL USING (
+    EXISTS (SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role = 'admin')
+  );
+
+-- Public policies for work groups and absence types
+CREATE POLICY "Anyone can view work groups" ON work_groups
+  FOR SELECT USING (true);
+
+CREATE POLICY "Anyone can view absence types" ON absence_types
+  FOR SELECT USING (true);
+
+
+---NOVA NOVA SA ADMIN:-- Enable UUID extension
+CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
+
+-- Employees table
+CREATE TABLE employees (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  user_id UUID REFERENCES auth.users NOT NULL,
+  first_name TEXT NOT NULL,
+  last_name TEXT NOT NULL,
+  email TEXT NOT NULL,
+  work_group INTEGER DEFAULT 1,
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(user_id)
+);
+
+-- User roles table
+CREATE TABLE user_roles (
+  user_id UUID REFERENCES auth.users PRIMARY KEY,
+  role TEXT NOT NULL DEFAULT 'user',
+  created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Work groups table
+CREATE TABLE work_groups (
+  id INTEGER PRIMARY KEY,
+  name TEXT NOT NULL,
+  start_time TIME NOT NULL,
+  end_time TIME NOT NULL,
+  has_rest_day BOOLEAN DEFAULT false
+);
+
+-- Absence types table
+CREATE TABLE absence_types (
+  id TEXT PRIMARY KEY,
+  name TEXT NOT NULL,
+  color TEXT NOT NULL,
+  is_active BOOLEAN DEFAULT true
+);
+
+-- Absence records table
+CREATE TABLE absence_records (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  employee_id UUID REFERENCES employees NOT NULL,
+  absence_type_id TEXT REFERENCES absence_types NOT NULL,
+  date DATE NOT NULL,
+  hours NUMERIC DEFAULT 8,
+  status TEXT DEFAULT 'approved',
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  UNIQUE(employee_id, date)
+);
+
+-- Insert default work groups
+INSERT INTO work_groups (id, name, start_time, end_time, has_rest_day) VALUES
+(1, 'Grupa 1', '07:00', '15:00', false),
+(2, 'Grupa 2', '07:00', '20:00', true);
+
+-- Insert default absence types
+INSERT INTO absence_types (id, name, color) VALUES
+('V', 'Godišnji odmor', '#10B981'),
+('S', 'Slobodan dan', '#8B5CF6'),
+('B', 'Bolovanje', '#EF4444'),
+('D', 'Smrtni slučaj u porodici', '#6B7280'),
+('C', 'Vjerski praznik', '#F59E0B');
+
+-- =============================================================================
+-- ADMIN USERS SETUP
+-- =============================================================================
+
+-- NOTE: After these users sign up through the application, run the following
+-- SQL commands to set them as admins (replace USER_ID with their actual user IDs):
+
+/*
+-- To find user IDs after they sign up:
+SELECT id, email FROM auth.users WHERE email IN ('alen.vocanec@apm.co.me', 'jovana.papan@apm.co.me');
+
+-- Then set them as admins (replace 'user_id_here' with actual UUIDs):
+INSERT INTO user_roles (user_id, role) VALUES 
+('user_id_for_alen', 'admin'),
+('user_id_for_jovana', 'admin');
+
+-- Also create their employee records (replace user_id with actual UUIDs):
+INSERT INTO employees (user_id, first_name, last_name, email, work_group) VALUES
+('user_id_for_alen', 'Alen', 'Vocanec', 'alen.vocanec@apm.co.me', 1),
+('user_id_for_jovana', 'Jovana', 'Papan', 'jovana.papan@apm.co.me', 1);
+*/
+
+-- =============================================================================
+
+-- Enable RLS
+ALTER TABLE employees ENABLE ROW LEVEL SECURITY;
+ALTER TABLE user_roles ENABLE ROW LEVEL SECURITY;
+ALTER TABLE absence_records ENABLE ROW LEVEL SECURITY;
+ALTER TABLE work_groups ENABLE ROW LEVEL SECURITY;
+ALTER TABLE absence_types ENABLE ROW LEVEL SECURITY;
+
+-- RLS Policies
+CREATE POLICY "Users can view own employee data" ON employees
+  FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Admins can view all employees" ON employees
+  FOR SELECT USING (
+    EXISTS (SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role = 'admin')
+  );
+
+CREATE POLICY "Users can insert own employee data" ON employees
+  FOR INSERT WITH CHECK (auth.uid() = user_id);
+
+CREATE POLICY "Users can view own role" ON user_roles
+  FOR SELECT USING (auth.uid() = user_id);
+
+CREATE POLICY "Admins can view all roles" ON user_roles
+  FOR SELECT USING (
+    EXISTS (SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role = 'admin')
+  );
+
+CREATE POLICY "Users can view own absence records" ON absence_records
+  FOR SELECT USING (
+    employee_id IN (SELECT id FROM employees WHERE user_id = auth.uid())
+  );
+
+CREATE POLICY "Admins can manage all absence records" ON absence_records
+  FOR ALL USING (
+    EXISTS (SELECT 1 FROM user_roles WHERE user_id = auth.uid() AND role = 'admin')
+  );
+
+-- Public policies for work groups and absence types
+CREATE POLICY "Anyone can view work groups" ON work_groups
+  FOR SELECT USING (true);
+
+CREATE POLICY "Anyone can view absence types" ON absence_types
+  FOR SELECT USING (true);
+
+-- =============================================================================
+-- ADDITIONAL USEFUL FUNCTIONS
+-- =============================================================================
+
+-- Function to easily set a user as admin (run this after user signs up)
+CREATE OR REPLACE FUNCTION set_user_as_admin(user_email TEXT)
+RETURNS TEXT AS $$
+DECLARE
+    user_uuid UUID;
+BEGIN
+    -- Get user ID from auth.users
+    SELECT id INTO user_uuid 
+    FROM auth.users 
+    WHERE email = user_email;
+    
+    IF user_uuid IS NULL THEN
+        RETURN 'User not found: ' || user_email;
+    END IF;
+    
+    -- Insert or update user role as admin
+    INSERT INTO user_roles (user_id, role)
+    VALUES (user_uuid, 'admin')
+    ON CONFLICT (user_id) 
+    DO UPDATE SET role = 'admin';
+    
+    RETURN 'User ' || user_email || ' set as admin successfully';
+END;
+$$ LANGUAGE plpgsql;
+
+-- Function to create employee record for admin user
+CREATE OR REPLACE FUNCTION create_employee_for_admin(user_email TEXT, first_name TEXT, last_name TEXT)
+RETURNS TEXT AS $$
+DECLARE
+    user_uuid UUID;
+BEGIN
+    -- Get user ID from auth.users
+    SELECT id INTO user_uuid 
+    FROM auth.users 
+    WHERE email = user_email;
+    
+    IF user_uuid IS NULL THEN
+        RETURN 'User not found: ' || user_email;
+    END IF;
+    
+    -- Create employee record
+    INSERT INTO employees (user_id, first_name, last_name, email, work_group)
+    VALUES (user_uuid, first_name, last_name, user_email, 1)
+    ON CONFLICT (user_id) 
+    DO UPDATE SET 
+        first_name = EXCLUDED.first_name,
+        last_name = EXCLUDED.last_name,
+        email = EXCLUDED.email;
+    
+    RETURN 'Employee record created for ' || user_email;
+END;
+$$ LANGUAGE plpgsql;
+
+How to Set Up the Admin Users:
+Step 1: Run the SQL Script
+Execute the entire SQL script in your Supabase SQL editor.
+
+Step 2: Have Users Sign Up
+Ask Alen and Jovana to:
+
+Go to your application
+
+Click "Registracija"
+
+Sign up with their emails: alen.vocanec@apm.co.me and jovana.papan@apm.co.me
+
+Step 3: Set Them as Admins
+After they sign up, run these commands in Supabase SQL editor:
+
+-- First, find their user IDs:
+SELECT id, email FROM auth.users WHERE email IN ('alen.vocanec@apm.co.me', 'jovana.papan@apm.co.me');
+
+-- Then use the helper functions to set them as admins:
+SELECT set_user_as_admin('alen.vocanec@apm.co.me');
+SELECT set_user_as_admin('jovana.papan@apm.co.me');
+
+-- Create their employee records:
+SELECT create_employee_for_admin('alen.vocanec@apm.co.me', 'Alen', 'Vocanec');
+SELECT create_employee_for_admin('jovana.papan@apm.co.me', 'Jovana', 'Papan');
+
+Alternative: Manual Setup
+If you prefer to do it manually after they sign up:
+
+sql
+-- Get their user IDs first
+SELECT id, email FROM auth.users WHERE email IN ('alen.vocanec@apm.co.me', 'jovana.papan@apm.co.me');
+
+-- Then manually insert (replace with actual UUIDs):
+INSERT INTO user_roles (user_id, role) VALUES 
+('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'admin'),
+('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'admin');
+
+INSERT INTO employees (user_id, first_name, last_name, email, work_group) VALUES
+('aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'Alen', 'Vocanec', 'alen.vocanec@apm.co.me', 1),
+('bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb', 'Jovana', 'Papan', 'jovana.papan@apm.co.me', 1);
+
+----ispravka -- Fix RLS policies to avoid recursion
+DROP POLICY IF EXISTS "Users can view own employee data" ON employees;
+DROP POLICY IF EXISTS "Admins can view all employees" ON employees;
+DROP POLICY IF EXISTS "Users can view own role" ON user_roles;
+DROP POLICY IF EXISTS "Admins can view all roles" ON user_roles;
+DROP POLICY IF EXISTS "Allow employee creation during signup" ON employees;
+DROP POLICY IF EXISTS "Allow user role creation during signup" ON user_roles;
+
+-- Create safe, non-recursive policies
+CREATE POLICY "Enable read access for all users" ON employees FOR SELECT USING (true);
+CREATE POLICY "Enable insert for authenticated users" ON employees FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+CREATE POLICY "Enable update for users based on user_id" ON employees FOR UPDATE USING (auth.uid() = user_id);
+
+CREATE POLICY "Enable read access for all users" ON user_roles FOR SELECT USING (true);
+CREATE POLICY "Enable insert for authenticated users" ON user_roles FOR INSERT WITH CHECK (auth.role() = 'authenticated');
+
+-- Now add your user data
+DO $$
+DECLARE
+    user_uuid uuid;  -- Renamed to avoid ambiguity
+BEGIN
+    -- Get your user ID
+    SELECT id INTO user_uuid 
+    FROM auth.users 
+    WHERE email = 'alen.vocanec@apm.co.me';
+    
+    IF user_uuid IS NOT NULL THEN
+        -- Insert or update employee record
+        INSERT INTO employees (user_id, first_name, last_name, email, work_group)
+        VALUES (user_uuid, 'Alen', 'Vocanec', 'alen.vocanec@apm.co.me', 1)
+        ON CONFLICT (user_id) DO UPDATE SET
+            first_name = EXCLUDED.first_name,
+            last_name = EXCLUDED.last_name,
+            email = EXCLUDED.email;
+        
+        -- Set as admin
+        INSERT INTO user_roles (user_id, role)
+        VALUES (user_uuid, 'admin')
+        ON CONFLICT (user_id) DO UPDATE SET
+            role = EXCLUDED.role;
+            
+        -- Add test absence record
+        INSERT INTO absence_records (employee_id, absence_type_id, date, hours, status)
+        SELECT 
+            id,
+            'V',
+            CURRENT_DATE - INTERVAL '5 days',
+            8,
+            'approved'
+        FROM employees 
+        WHERE user_id = user_uuid
+        ON CONFLICT (employee_id, date) DO NOTHING;
+        
+        RAISE NOTICE 'Successfully added user: alen.vocanec@apm.co.me';
+    ELSE
+        RAISE NOTICE 'User not found: alen.vocanec@apm.co.me - make sure they have signed up first';
+    END IF;
+END $$;
+
+
+
+---nova nova nova
+-- Remove the restrictive insert policy
+DROP POLICY IF EXISTS "Users can insert own employee data" ON employees;
+
+-- Create a new policy that allows signups
+CREATE POLICY "Allow employee creation during signup" ON employees
+  FOR INSERT WITH CHECK (true);
+
+-- Also allow user role creation during signup
+DROP POLICY IF EXISTS "Users can view own role" ON user_roles;
+CREATE POLICY "Allow user role creation during signup" ON user_roles
+  FOR INSERT WITH CHECK (true);
+
+CREATE POLICY "Users can view own role" ON user_roles
+  FOR SELECT USING (auth.uid() = user_id);
+
+  ---nova nova nova---manuelno kreiranje user id
+  -- Make user_id nullable for manually created employees
+ALTER TABLE employees ALTER COLUMN user_id DROP NOT NULL;
+
+-- Add a check constraint or update RLS policies if needed
+CREATE OR REPLACE FUNCTION is_manual_employee()
+RETURNS BOOLEAN AS $$
+BEGIN
+  RETURN (SELECT user_id IS NULL FROM employees WHERE id = NEW.id);
+END;
+$$ LANGUAGE plpgsql;
+
+-- Update RLS policies to allow manual employees
+DROP POLICY IF EXISTS "Enable insert for authenticated users" ON employees;
+CREATE POLICY "Enable insert for authenticated users" ON employees
+FOR INSERT WITH CHECK (
+  auth.role() = 'authenticated' AND 
+  (auth.uid() = user_id OR user_id IS NULL)
+);
+
+

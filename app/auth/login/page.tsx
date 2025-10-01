@@ -7,6 +7,9 @@ import { useRouter } from 'next/navigation';
 import { Button } from '../../../components/ui/button';
 import { supabase } from '../../../lib/supabase';
 
+// Add this line to prevent static generation
+export const dynamic = 'force-dynamic';
+
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');

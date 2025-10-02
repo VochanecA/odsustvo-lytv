@@ -1,4 +1,3 @@
-// app/auth/login/page.tsx
 'use client';
 
 import { useState, useEffect } from 'react';
@@ -7,17 +6,55 @@ import { useRouter } from 'next/navigation';
 import { Button } from '../../../components/ui/button';
 import { supabase } from '../../../lib/supabase';
 
-// Add this line to prevent static generation
 export const dynamic = 'force-dynamic';
+
+const EyeIcon = ({ className }: { className?: string }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    className={className}
+    fill="none"
+    viewBox="0 0 24 24"
+    stroke="currentColor"
+    strokeWidth={2}
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"
+    />
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M2.458 12C3.732 7.943 7.523 5 12 5c4.477 0 8.268 2.943 9.542 7-1.274 4.057-5.065 7-9.542 7-4.477 0-8.268-2.943-9.542-7z"
+    />
+  </svg>
+);
+
+const EyeOffIcon = ({ className }: { className?: string }) => (
+  <svg
+    xmlns="http://www.w3.org/2000/svg"
+    className={className}
+    fill="none"
+    viewBox="0 0 24 24"
+    stroke="currentColor"
+    strokeWidth={2}
+  >
+    <path
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      d="M13.875 18.825A10.05 10.05 0 0112 19c-4.477 0-8.268-2.943-9.542-7a9.971 9.971 0 012.42-4.18m1.094-1.502A9.959 9.959 0 0112 5c4.477 0 8.268 2.943 9.542 7a9.974 9.974 0 01-4.102 4.922M3 3l18 18"
+    />
+  </svg>
+);
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
   const router = useRouter();
 
-  // Check if user is already logged in
   useEffect(() => {
     const checkSession = async () => {
       const { data: { session } } = await supabase.auth.getSession();
@@ -44,7 +81,6 @@ export default function LoginPage() {
 
       console.log('Login successful:', data);
 
-      // Force a page reload to ensure session is properly set
       window.location.href = '/dashboard';
       
     } catch (error: any) {
@@ -99,17 +135,40 @@ export default function LoginPage() {
               <label htmlFor="password" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
                 Lozinka
               </label>
-              <input
-                id="password"
-                name="password"
-                type="password"
-                required
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
-                placeholder="••••••••"
-              />
+              <div className="relative">
+                <input
+                  id="password"
+                  name="password"
+                  type={showPassword ? 'text' : 'password'}
+                  required
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  className="mt-1 block w-full px-3 py-2 pr-10 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:border-gray-600 dark:text-white"
+                  placeholder="••••••••"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute inset-y-0 right-0 pr-3 flex items-center"
+                  aria-label={showPassword ? 'Sakrij lozinku' : 'Prikaži lozinku'}
+                >
+                  {showPassword ? (
+                    <EyeOffIcon className="h-5 w-5 text-gray-600 dark:text-gray-300" />
+                  ) : (
+                    <EyeIcon className="h-5 w-5 text-gray-600 dark:text-gray-300" />
+                  )}
+                </button>
+              </div>
             </div>
+          </div>
+
+          <div className="text-right">
+            <Link
+              href="/auth/forgot-password"
+              className="text-sm text-blue-600 hover:text-blue-500 dark:text-blue-400 dark:hover:text-blue-300"
+            >
+              Zaboravili ste lozinku?
+            </Link>
           </div>
 
           <div>

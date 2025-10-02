@@ -140,7 +140,7 @@ export default function HomePage() {
               Kalendarski prikaz
             </h3>
             <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
-              Vizuelni prikaz odsustva po mesecima i godinama
+              Vizuelni prikaz odsustva po mjesecima i godinama
             </p>
           </div>
 
@@ -153,7 +153,7 @@ export default function HomePage() {
               PDF izveštaji
             </h3>
             <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
-              Generišite detaljne mesečne i godišnje izveštaje
+              Generišite detaljne mjesečne i godišnje izvještaje
             </p>
           </div>
 

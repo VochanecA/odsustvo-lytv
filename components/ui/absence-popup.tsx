@@ -1,10 +1,18 @@
-// app/components/absence-popup.tsx
+// components/ui/absence-popup.tsx
 'use client';
 
 import { X, Trash2, Save } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { AbsenceType } from '@/types';
+import { Button } from './button'; // Koristite relativni import
 import { useState, useEffect } from 'react';
+
+// Definišite lokalni interfejs za ovu komponentu
+interface AbsenceType {
+  id: string;
+  name: string;
+  color: string;
+  is_active: boolean;
+  company_id?: string; // Opciono, ako postoji
+}
 
 interface AbsencePopupProps {
   isOpen: boolean;
@@ -80,7 +88,7 @@ export function AbsencePopup({
                 className="w-3 h-3 rounded-full ml-2 mr-1"
                 style={{ backgroundColor: currentAbsence.color }}
               />
-              <span>{currentAbsence.name} ({currentAbsence.id})</span>
+              <span>{currentAbsence.name}</span>
             </div>
           )}
         </div>
@@ -105,7 +113,7 @@ export function AbsencePopup({
                 style={{ backgroundColor: type.color }}
               />
               <span className="text-left flex-1">
-                {type.name} ({type.id})
+                {type.name}
               </span>
               {selectedType === type.id && (
                 <div className="w-2 h-2 bg-blue-500 rounded-full" />

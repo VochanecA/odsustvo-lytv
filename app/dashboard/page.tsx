@@ -7,38 +7,8 @@ import { AbsencePopup } from '../../components/ui/absence-popup';
 import { Button } from '../../components/ui/button';
 import { Plus, Download, Filter, Users, Calendar as CalendarIcon, Search } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-
-interface Employee {
-  id: string;
-  first_name: string;
-  last_name: string;
-  email: string;
-  work_group: number;
-}
-
-interface AbsenceRecord {
-  id: string;
-  employee_id: string;
-  absence_type_id: string;
-  date: string;
-  hours: number;
-  status: string;
-}
-
-interface AbsenceType {
-  id: string;
-  name: string;
-  color: string;
-  is_active: boolean;
-}
-
-interface WorkGroup {
-  id: number;
-  name: string;
-  start_time: string;
-  end_time: string;
-  has_rest_day: boolean;
-}
+// Import tipova iz vašeg types/index.ts
+import type { Employee, AbsenceRecord, AbsenceType, WorkGroup } from '../../types';
 
 // Helper function to format date to YYYY-MM-DD without timezone issues
 const formatDateToString = (date: Date): string => {
@@ -68,11 +38,26 @@ export default function DashboardPage() {
   const fetchData = async () => {
     try {
       setError(null);
+      
+      // Prvo dobijte sve kompanije da biste mogli filtrirati absence_types
+      const { data: companies, error: companiesError } = await supabase
+        .from('companies')
+        .select('id')
+        .eq('is_active', true);
+
+      if (companiesError) throw companiesError;
+
+      const companyIds = companies?.map(c => c.id) || [];
+
       const [employeesResponse, groupsResponse, recordsResponse, typesResponse] = await Promise.all([
         supabase.from('employees').select('*'),
         supabase.from('work_groups').select('*'),
         supabase.from('absence_records').select('*'),
-        supabase.from('absence_types').select('*').eq('is_active', true)
+        // Filtriraj absence_types po aktivnim kompanijama
+        supabase.from('absence_types')
+          .select('*')
+          .eq('is_active', true)
+          .in('company_id', companyIds)
       ]);
 
       if (employeesResponse.error) throw employeesResponse.error;

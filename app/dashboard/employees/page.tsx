@@ -2,7 +2,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { Plus, Eye, Search, Edit, Trash2, Users, Filter, Building, X, ArrowLeft, ArrowRight } from 'lucide-react';
+import { Plus, Eye, Search, Edit, Trash2, Users, Filter, Building, X } from 'lucide-react';
 import { Button } from '../../../components/ui/button';
 import { EmployeeForm } from '@/components/employee-form';
 import { DeleteConfirmation } from '@/components/delete-confirmation';
@@ -18,6 +18,7 @@ interface Employee {
   created_at: string;
   company_id: string;
   department_id: string | null;
+  user_id?: string; // Dodajte ovo kao opcionalno polje
 }
 
 interface WorkGroup {
@@ -386,7 +387,7 @@ export default function EmployeesPage() {
             )}
             {searchTerm && (
               <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200">
-                Pretraga: "{searchTerm}"
+                Pretraga: &quot;{searchTerm}&quot;
               </span>
             )}
             <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">

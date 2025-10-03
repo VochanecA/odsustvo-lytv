@@ -5,12 +5,10 @@ import { useState, useEffect } from 'react';
 import { Calendar } from '../../components/ui/calendar';
 import { AbsencePopup } from '../../components/ui/absence-popup';
 import { Button } from '../../components/ui/button';
-import { Plus, Download, Filter, Users, Calendar as CalendarIcon, Search, Building, UserX } from 'lucide-react';
+import { Plus, Download, Filter, Users, Calendar as CalendarIcon, Search, Building, UserX, Shield } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
-// Import tipova iz vašeg types/index.ts
 import type { Employee, AbsenceRecord, AbsenceType, WorkGroup, Company, Department } from '../../types';
 
-// Helper function to format date to YYYY-MM-DD without timezone issues
 const formatDateToString = (date: Date): string => {
   const year = date.getFullYear();
   const month = String(date.getMonth() + 1).padStart(2, '0');
@@ -35,13 +33,14 @@ export default function DashboardPage() {
   const [selectedCompanyId, setSelectedCompanyId] = useState<string>('');
   const [selectedDepartmentId, setSelectedDepartmentId] = useState<string>('');
   const [currentUser, setCurrentUser] = useState<any>(null);
-  const [userHasEmployeeProfile, setUserHasEmployeeProfile] = useState<boolean>(true);
+  const [currentEmployee, setCurrentEmployee] = useState<Employee | null>(null);
+  const [userRole, setUserRole] = useState<string>('user');
+  const [isAdmin, setIsAdmin] = useState<boolean>(false);
 
   useEffect(() => {
     fetchData();
   }, []);
 
-  // Fetch departments kada se promijeni kompanija
   useEffect(() => {
     if (selectedCompanyId) {
       fetchDepartmentsByCompany(selectedCompanyId);
@@ -55,81 +54,192 @@ export default function DashboardPage() {
       setError(null);
       setLoading(true);
       
-      // Prvo provjeri da li je korisnik prijavljen
+      console.log('🔍 Početak fetchData...');
+
+      // Provjeri prijavljenog korisnika
       const { data: { user }, error: userError } = await supabase.auth.getUser();
       
       if (userError) {
+        console.error('❌ Greška pri provjeri korisnika:', userError);
         throw new Error('Greška pri provjeri korisnika: ' + userError.message);
       }
 
       if (!user) {
+        console.error('❌ Korisnik nije prijavljen');
         throw new Error('Korisnik nije prijavljen');
       }
 
+      console.log('✅ Korisnik prijavljen:', { id: user.id, email: user.email });
       setCurrentUser(user);
 
-      // Provjeri da li korisnik ima employee zapis
-      const { data: userEmployee, error: userEmployeeError } = await supabase
-        .from('employees')
-        .select('company_id, first_name, last_name')
+      // PRVO: Provjeri user_roles da vidimo da li je admin
+      console.log('🔍 Provjera user_roles za user_id:', user.id);
+      const { data: userRoleData, error: roleError } = await supabase
+        .from('user_roles')
+        .select('role')
         .eq('user_id', user.id)
         .single();
 
-      if (userEmployeeError || !userEmployee) {
-        console.warn('Korisnik nema employee profil:', userEmployeeError);
-        setUserHasEmployeeProfile(false);
-        setLoading(false);
-        return;
+      if (roleError) {
+        console.warn('⚠️ Greška pri učitavanju user role:', roleError);
+        // Nastavljamo dalje, možda korisnik nema ulogu definiranu
+      } else {
+        console.log('✅ User role pronađen:', userRoleData);
       }
 
-      setUserHasEmployeeProfile(true);
+      const currentUserRole = userRoleData?.role || 'user';
+      const userIsAdmin = currentUserRole === 'admin';
+      
+      setUserRole(currentUserRole);
+      setIsAdmin(userIsAdmin);
+      console.log('🎭 Korisnička uloga:', currentUserRole, 'isAdmin:', userIsAdmin);
 
-      const userCompanyId = userEmployee.company_id;
+      // DRUGO: Pronađi employee zapis za ovog korisnika
+      console.log('🔍 Tražim employee za user_id:', user.id);
+      const { data: userEmployee, error: userEmployeeError } = await supabase
+        .from('employees')
+        .select('*')
+        .eq('user_id', user.id)
+        .single();
 
-      if (!userCompanyId) {
-        throw new Error('Korisnik nije povezan sa kompanijom');
+      console.log('📊 Rezultat employee pretrage:', {
+        data: userEmployee,
+        error: userEmployeeError,
+        hasData: !!userEmployee,
+        hasError: !!userEmployeeError
+      });
+
+      if (userEmployeeError) {
+        console.error('❌ Greška pri employee upitu:', userEmployeeError);
+        // Provjeri da li je to "no rows" greška
+        if (userEmployeeError.code === 'PGRST116') {
+          throw new Error(`Korisnik nema employee profil. User ID: ${user.id}`);
+        } else {
+          throw new Error('Greška pri učitavanju employee profila: ' + userEmployeeError.message);
+        }
       }
 
-      // Svi upiti će automatski biti filtrirani po RLS politikama
-      const [
-        companiesResponse, 
-        employeesResponse, 
-        groupsResponse, 
-        recordsResponse, 
-        typesResponse, 
-        departmentsResponse
-      ] = await Promise.all([
-        supabase.from('companies').select('*').eq('is_active', true).order('name'),
-        supabase.from('employees').select('*').order('first_name'),
-        supabase.from('work_groups').select('*').order('name'),
-        supabase.from('absence_records').select('*'),
-        supabase.from('absence_types').select('*').eq('is_active', true).order('name'),
-        supabase.from('departments').select('*').eq('is_active', true).order('name')
-      ]);
+      if (!userEmployee) {
+        console.error('❌ Employee nije pronađen');
+        throw new Error(`Korisnik nema employee profil. User ID: ${user.id}`);
+      }
 
-      if (companiesResponse.error) throw companiesResponse.error;
-      if (employeesResponse.error) throw employeesResponse.error;
-      if (groupsResponse.error) throw groupsResponse.error;
-      if (recordsResponse.error) console.warn('Absence records error:', recordsResponse.error);
-      if (typesResponse.error) throw typesResponse.error;
-      if (departmentsResponse.error) console.warn('Departments error:', departmentsResponse.error);
+      console.log('✅ Employee pronađen:', userEmployee);
+      setCurrentEmployee(userEmployee);
 
-      setCompanies(companiesResponse.data || []);
-      setEmployees(employeesResponse.data || []);
-      setWorkGroups(groupsResponse.data || []);
-      setAbsenceRecords(recordsResponse.data || []);
-      setAbsenceTypes(typesResponse.data || []);
-      setDepartments(departmentsResponse.data || []);
+      // TREĆE: Učitaj podatke ovisno o ulozi
+      if (userIsAdmin) {
+        console.log('👑 Admin korisnik - učitavam sve podatke');
+        await loadAllData();
+      } else {
+        console.log('👤 Običan korisnik - učitavam filtrirane podatke');
+        await loadFilteredData(userEmployee);
+      }
 
-      // Automatski selektuj kompaniju korisnika
-      setSelectedCompanyId(userCompanyId);
+      console.log('✅ Svi podaci uspješno učitani');
 
     } catch (error: any) {
-      console.error('Error fetching data:', error);
+      console.error('💥 Error fetching data:', error);
       setError(error.message);
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadAllData = async () => {
+    console.log('📥 Učitavam sve podatke...');
+    
+    const [
+      companiesResponse, 
+      employeesResponse, 
+      groupsResponse, 
+      recordsResponse, 
+      typesResponse, 
+      departmentsResponse
+    ] = await Promise.all([
+      supabase.from('companies').select('*').eq('is_active', true).order('name'),
+      supabase.from('employees').select('*').order('first_name'),
+      supabase.from('work_groups').select('*').order('name'),
+      supabase.from('absence_records').select('*'),
+      supabase.from('absence_types').select('*').eq('is_active', true).order('name'),
+      supabase.from('departments').select('*').eq('is_active', true).order('name')
+    ]);
+
+    console.log('📊 Rezultati učitavanja:', {
+      companies: companiesResponse.data?.length || 0,
+      employees: employeesResponse.data?.length || 0,
+      workGroups: groupsResponse.data?.length || 0,
+      absenceRecords: recordsResponse.data?.length || 0,
+      absenceTypes: typesResponse.data?.length || 0,
+      departments: departmentsResponse.data?.length || 0
+    });
+
+    // Rukovanje greškama
+    if (companiesResponse.error) console.warn('Companies error:', companiesResponse.error);
+    if (employeesResponse.error) console.warn('Employees error:', employeesResponse.error);
+    if (groupsResponse.error) console.warn('Work groups error:', groupsResponse.error);
+    if (recordsResponse.error) console.warn('Absence records error:', recordsResponse.error);
+    if (typesResponse.error) console.warn('Absence types error:', typesResponse.error);
+    if (departmentsResponse.error) console.warn('Departments error:', departmentsResponse.error);
+
+    setCompanies(companiesResponse.data || []);
+    setEmployees(employeesResponse.data || []);
+    setWorkGroups(groupsResponse.data || []);
+    setAbsenceRecords(recordsResponse.data || []);
+    setAbsenceTypes(typesResponse.data || []);
+    setDepartments(departmentsResponse.data || []);
+
+    // Postavi kompaniju trenutnog korisnika kao default
+    if (currentEmployee?.company_id) {
+      setSelectedCompanyId(currentEmployee.company_id);
+    }
+  };
+
+  const loadFilteredData = async (userEmployee: Employee) => {
+    console.log('📥 Učitavam filtrirane podatke za kompaniju:', userEmployee.company_id);
+    
+    const [
+      companiesResponse, 
+      employeesResponse, 
+      groupsResponse, 
+      recordsResponse, 
+      typesResponse, 
+      departmentsResponse
+    ] = await Promise.all([
+      supabase.from('companies').select('*').eq('id', userEmployee.company_id).single(),
+      supabase.from('employees').select('*').eq('company_id', userEmployee.company_id).order('first_name'),
+      supabase.from('work_groups').select('*').eq('company_id', userEmployee.company_id).order('name'),
+      supabase.from('absence_records').select('*'),
+      supabase.from('absence_types').select('*').eq('company_id', userEmployee.company_id).eq('is_active', true).order('name'),
+      supabase.from('departments').select('*').eq('company_id', userEmployee.company_id).eq('is_active', true).order('name')
+    ]);
+
+    console.log('📊 Rezultati filtriranog učitavanja:', {
+      companies: companiesResponse.data ? 1 : 0,
+      employees: employeesResponse.data?.length || 0,
+      workGroups: groupsResponse.data?.length || 0,
+      absenceRecords: recordsResponse.data?.length || 0,
+      absenceTypes: typesResponse.data?.length || 0,
+      departments: departmentsResponse.data?.length || 0
+    });
+
+    // Rukovanje greškama
+    if (companiesResponse.error) console.warn('Companies error:', companiesResponse.error);
+    if (employeesResponse.error) console.warn('Employees error:', employeesResponse.error);
+    if (groupsResponse.error) console.warn('Work groups error:', groupsResponse.error);
+    if (recordsResponse.error) console.warn('Absence records error:', recordsResponse.error);
+    if (typesResponse.error) console.warn('Absence types error:', typesResponse.error);
+    if (departmentsResponse.error) console.warn('Departments error:', departmentsResponse.error);
+
+    setCompanies(companiesResponse.data ? [companiesResponse.data] : []);
+    setEmployees(employeesResponse.data || []);
+    setWorkGroups(groupsResponse.data || []);
+    setAbsenceRecords(recordsResponse.data || []);
+    setAbsenceTypes(typesResponse.data || []);
+    setDepartments(departmentsResponse.data || []);
+
+    // Postavi kompaniju korisnika
+    setSelectedCompanyId(userEmployee.company_id);
   };
 
   const fetchDepartmentsByCompany = async (companyId: string) => {
@@ -149,6 +259,12 @@ export default function DashboardPage() {
   };
 
   const handleDateClick = (employeeId: string, date: Date) => {
+    // Provjeri da li korisnik ima pravo da mijenja ovog employee-a
+    if (!isAdmin && employeeId !== currentEmployee?.id) {
+      setError('Nemate pravo da mijenjate odsustva drugih zaposlenih');
+      return;
+    }
+
     setSelectedEmployee(employeeId);
     setSelectedDate(date);
     
@@ -202,6 +318,11 @@ export default function DashboardPage() {
 
   // Filter employees based on search term and company/department
   const filteredEmployees = employees.filter(employee => {
+    // Za obične korisnike, prikaži samo njihov profil
+    if (!isAdmin && employee.id !== currentEmployee?.id) {
+      return false;
+    }
+
     // Filter po kompaniji
     if (selectedCompanyId && employee.company_id !== selectedCompanyId) {
       return false;
@@ -227,27 +348,23 @@ export default function DashboardPage() {
     );
   });
 
-  // Reset department filter kada se promijeni kompanija
   const handleCompanyChange = (companyId: string) => {
     setSelectedCompanyId(companyId);
-    setSelectedDepartmentId(''); // Reset department filter
+    setSelectedDepartmentId('');
   };
 
-  // Reset sve filtere
   const resetFilters = () => {
-    // Resetuj na kompaniju korisnika
-    const userCompanyId = companies.find(c => c.id === selectedCompanyId)?.id;
-    setSelectedCompanyId(userCompanyId || '');
+    if (currentEmployee?.company_id) {
+      setSelectedCompanyId(currentEmployee.company_id);
+    }
     setSelectedDepartmentId('');
     setSearchTerm('');
   };
 
-  // Dobijte ime kompanije za prikaz
   const getCompanyName = (companyId: string) => {
     return companies.find(c => c.id === companyId)?.name || 'Nepoznato';
   };
 
-  // Dobijte ime službe za prikaz
   const getDepartmentName = (departmentId: string) => {
     return departments.find(d => d.id === departmentId)?.name || 'Nepoznato';
   };
@@ -260,72 +377,17 @@ export default function DashboardPage() {
     );
   }
 
-  // Prikaz ako korisnik nema employee profil
-  if (!userHasEmployeeProfile) {
-    return (
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-              Kalendar odsustva
-            </h1>
-            <p className="text-gray-600 dark:text-gray-400 mt-1">
-              Pregled i upravljanje odsustvima zaposlenih
-            </p>
-          </div>
-        </div>
-
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8 text-center">
-          <UserX className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-            Nema podataka o zaposlenom
-          </h2>
-          <p className="text-gray-600 dark:text-gray-400 mb-4">
-            Vaš korisnički nalog <strong>{currentUser?.email}</strong> nije povezan sa podacima o zaposlenom.
-          </p>
-          <p className="text-gray-500 dark:text-gray-500 text-sm mb-6">
-            Ovo se može desiti ako:
-          </p>
-          <ul className="text-gray-600 dark:text-gray-400 text-sm text-left max-w-md mx-auto space-y-2 mb-6">
-            <li className="flex items-start">
-              <span className="text-blue-500 mr-2">•</span>
-              Registrovali ste se, ali administrator još uvijek nije potvrdio vaš nalog
-            </li>
-            <li className="flex items-start">
-              <span className="text-blue-500 mr-2">•</span>
-              Došlo je do greške pri kreiranju vašeg profila zaposlenog
-            </li>
-            <li className="flex items-start">
-              <span className="text-blue-500 mr-2">•</span>
-              Vaš nalog nije dodijeljen ni jednoj kompaniji
-            </li>
-          </ul>
-          <div className="flex justify-center space-x-4">
-            <Button onClick={fetchData}>
-              <Users className="h-4 w-4 mr-2" />
-              Ponovo učitaj
-            </Button>
-            <Button 
-              variant="outline" 
-              onClick={() => supabase.auth.signOut()}
-            >
-              Odjavi se
-            </Button>
-          </div>
-          <div className="mt-4 text-xs text-gray-500 dark:text-gray-500">
-            <p>Ako problem potraje, kontaktirajte administratora sistema.</p>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   if (error) {
     return (
       <div className="flex items-center justify-center min-h-96">
         <div className="text-center">
           <div className="text-red-600 text-lg mb-4">Greška pri učitavanju podataka</div>
           <div className="text-gray-600 dark:text-gray-400 mb-4">{error}</div>
+          <div className="text-sm text-gray-500 mb-4">
+            User ID: {currentUser?.id}<br/>
+            Role: {userRole}<br/>
+            isAdmin: {isAdmin ? 'Da' : 'Ne'}
+          </div>
           <Button onClick={fetchData}>Pokušaj ponovo</Button>
         </div>
       </div>
@@ -337,42 +399,6 @@ export default function DashboardPage() {
       employees.find(e => e.id === selectedEmployee)?.last_name
     : '';
 
-  if (employees.length === 0) {
-    return (
-      <div className="space-y-6">
-        <div className="flex justify-between items-center">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 dark:text-white">
-              Kalendar odsustva
-            </h1>
-            <p className="text-gray-600 dark:text-gray-400 mt-1">
-              Pregled i upravljanje odsustvima zaposlenih
-            </p>
-          </div>
-        </div>
-
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-8 text-center">
-          <Users className="h-16 w-16 text-gray-400 mx-auto mb-4" />
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-            Nema zaposlenih
-          </h2>
-          <p className="text-gray-600 dark:text-gray-400 mb-6">
-            Trenutno nema zaposlenih u sistemu. Prvo dodajte zaposlene da biste mogli evidentirati odsustva.
-          </p>
-          <div className="flex justify-center space-x-4">
-            <Button>
-              <Plus className="h-4 w-4 mr-2" />
-              Dodaj zaposlenog
-            </Button>
-            <Button variant="outline" onClick={fetchData}>
-              Osveži podatke
-            </Button>
-          </div>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center">
@@ -382,6 +408,12 @@ export default function DashboardPage() {
           </h1>
           <p className="text-gray-600 dark:text-gray-400 mt-1">
             Pregled i upravljanje odsustvima zaposlenih
+            {isAdmin && (
+              <span className="ml-2 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                <Shield className="h-3 w-3 mr-1" />
+                Administrator
+              </span>
+            )}
           </p>
         </div>
         <div className="flex space-x-3">
@@ -403,24 +435,26 @@ export default function DashboardPage() {
       {/* Filter Section */}
       <div className="bg-white dark:bg-gray-800 rounded-lg p-4 shadow">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          {/* Company Filter */}
-          <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-              Kompanija
-            </label>
-            <select
-              value={selectedCompanyId}
-              onChange={(e) => handleCompanyChange(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
-            >
-              <option value="">Sve kompanije</option>
-              {companies.map(company => (
-                <option key={company.id} value={company.id}>
-                  {company.name}
-                </option>
-              ))}
-            </select>
-          </div>
+          {/* Company Filter - samo za admina */}
+          {isAdmin && (
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                Kompanija
+              </label>
+              <select
+                value={selectedCompanyId}
+                onChange={(e) => handleCompanyChange(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-700 dark:text-white"
+              >
+                <option value="">Sve kompanije</option>
+                {companies.map(company => (
+                  <option key={company.id} value={company.id}>
+                    {company.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
           {/* Department Filter */}
           <div>
@@ -443,7 +477,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Search Bar */}
-          <div className="md:col-span-2">
+          <div className={isAdmin ? "md:col-span-2" : "md:col-span-3"}>
             <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               Pretraga zaposlenih
             </label>
@@ -462,6 +496,12 @@ export default function DashboardPage() {
 
         {/* Filter Status */}
         <div className="mt-3 flex flex-wrap gap-2">
+          {isAdmin && (
+            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+              <Shield className="h-3 w-3 mr-1" />
+              Administratorski pristup
+            </span>
+          )}
           {selectedCompanyId && (
             <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
               <Building className="h-3 w-3 mr-1" />
@@ -481,6 +521,11 @@ export default function DashboardPage() {
           {(selectedCompanyId || selectedDepartmentId || searchTerm) && (
             <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">
               Prikazano: {filteredEmployees.length} od {employees.length}
+            </span>
+          )}
+          {!isAdmin && (
+            <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
+              Pregled samo vlastitih podataka
             </span>
           )}
         </div>

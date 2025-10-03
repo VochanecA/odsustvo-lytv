@@ -25,8 +25,8 @@ import { Clock } from 'lucide-react';
 const navigation = [
   { name: 'Kalendar', href: '/dashboard', icon: Calendar },
   { name: 'Zaposleni', href: '/dashboard/employees', icon: Users },
-  { name: 'Radne Grupe', href: '/dashboard/work-groups', icon: Clock },
-  { name: 'Izveštaji', href: '/dashboard/reports', icon: FileText },
+  { name: 'Radno Vrijeme-Grupe', href: '/dashboard/work-groups', icon: Clock },
+  { name: 'Izvještaji', href: '/dashboard/reports', icon: FileText },
   { name: 'Podešavanja', href: '/dashboard/settings', icon: Settings },
 ];
 

@@ -5,7 +5,6 @@ import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Button } from '../../../components/ui/button';
-import { supabase } from '../../../lib/supabase';
 
 export default function SignupPage() {
   const [email, setEmail] = useState('');
@@ -37,84 +36,31 @@ export default function SignupPage() {
     }
 
     try {
-      // Koristite production URL za email confirmation
-      const baseUrl = 'https://odsustvo-lytv.vercel.app';
-      
-      const { data: authData, error: authError } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          data: {
-            first_name: firstName,
-            last_name: lastName
-          },
-          emailRedirectTo: `${baseUrl}/auth/callback`
-        }
+      const response = await fetch('/api/signup', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email,
+          password,
+          firstName,
+          lastName
+        }),
       });
 
-      if (authError) throw authError;
+      const data = await response.json();
 
-      // Ako je korisnik kreiran, napravite employee i role zapise
-      if (authData.user) {
-        try {
-          // Prvo pronađite default kompaniju
-          const { data: companies, error: companiesError } = await supabase
-            .from('companies')
-            .select('id')
-            .eq('is_active', true)
-            .limit(1);
-
-          if (companiesError) throw companiesError;
-
-          const companyId = companies && companies.length > 0 ? companies[0].id : null;
-
-          if (!companyId) {
-            throw new Error('Nije pronađena aktivna kompanija');
-          }
-
-          // Kreirajte employee zapis
-          const { error: profileError } = await supabase
-            .from('employees')
-            .insert({
-              user_id: authData.user.id,
-              first_name: firstName,
-              last_name: lastName,
-              email: email,
-              work_group: 1,
-              company_id: companyId
-            });
-
-          if (profileError) throw profileError;
-
-          // Kreirajte user role
-          const { error: roleError } = await supabase
-            .from('user_roles')
-            .insert({
-              user_id: authData.user.id,
-              role: 'user'
-            });
-
-          if (roleError) throw roleError;
-
-          setSuccess(true);
-          
-          // Auto-redirect nakon 3 sekunde
-          setTimeout(() => {
-            router.push('/auth/login?message=check-email');
-          }, 3000);
-
-        } catch (dbError: any) {
-          console.error('Database error:', dbError);
-          // Ako dođe do greške sa bazom, obrišite auth korisnika
-          await supabase.auth.admin.deleteUser(authData.user.id);
-          throw new Error('Greška pri kreiranju profila: ' + dbError.message);
-        }
-      } else {
-        setSuccess(true);
-        setTimeout(() => {
-          router.push('/auth/login?message=check-email');
-        }, 3000);
+      if (!response.ok) {
+        throw new Error(data.error || 'Došlo je do greške pri registraciji');
       }
+
+      setSuccess(true);
+      
+      // Auto-redirect nakon 3 sekunde
+      setTimeout(() => {
+        router.push('/auth/login?message=signup-success');
+      }, 3000);
 
     } catch (error: any) {
       console.error('Signup error:', error);
@@ -131,7 +77,7 @@ export default function SignupPage() {
           <div className="text-center">
             <div className="flex justify-center">
               <div className="flex items-center space-x-2">
-                <div className="h-10 w-10 bg-blue-600 rounded-lg flex items-center justify-center">
+                <div className="h-10 w-10 bg-green-600 rounded-lg flex items-center justify-center">
                   <span className="text-white font-bold text-xl">✓</span>
                 </div>
                 <span className="text-2xl font-bold text-gray-900 dark:text-white">
@@ -144,10 +90,10 @@ export default function SignupPage() {
             </h2>
             <div className="mt-4 bg-green-50 border border-green-200 rounded-md p-4">
               <p className="text-green-800 text-sm">
-                Poslali smo verifikacioni email na <strong>{email}</strong>.
+                Nalog za <strong>{email}</strong> je uspešno kreiran.
               </p>
               <p className="text-green-700 text-sm mt-2">
-                Molimo proverite vaš inbox i kliknite na link da verifikujete nalog.
+                Sada se možete prijaviti na sistem.
               </p>
             </div>
             <div className="mt-6">

@@ -163,7 +163,7 @@ export default function HomePage() {
               aria-hidden="true"
             />
             <h3 className="text-xl font-semibold mb-2 text-gray-900 dark:text-white">
-              Bezbedna platforma
+              Bezbjedna platforma
             </h3>
             <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
               RBAC sa admin i korisničkim ulogama

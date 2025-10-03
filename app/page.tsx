@@ -150,7 +150,7 @@ export default function HomePage() {
               aria-hidden="true"
             />
             <h3 className="text-xl font-semibold mb-2 text-gray-900 dark:text-white">
-              PDF izveštaji
+              PDF izvještaji
             </h3>
             <p className="text-gray-600 dark:text-gray-300 leading-relaxed">
               Generišite detaljne mjesečne i godišnje izvještaje

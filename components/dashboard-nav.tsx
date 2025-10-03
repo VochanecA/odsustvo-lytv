@@ -39,6 +39,7 @@ export function DashboardNav() {
   const [isOpen, setIsOpen] = useState(false);
   const [isUserMenuOpen, setIsUserMenuOpen] = useState(false);
   const [user, setUser] = useState<any>(null);
+  const [userRole, setUserRole] = useState<string>('user');
   const [loading, setLoading] = useState(true);
   const pathname = usePathname();
 
@@ -46,14 +47,40 @@ export function DashboardNav() {
     const getUser = async () => {
       const { data: { user } } = await supabase.auth.getUser();
       setUser(user);
+      
+      // Fetch user role
+      if (user) {
+        const { data: userRoleData } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', user.id)
+          .single();
+        
+        setUserRole(userRoleData?.role || 'user');
+      }
+      
       setLoading(false);
     };
     
     getUser();
 
     // Listen for auth state changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       setUser(session?.user || null);
+      
+      // Fetch user role when auth state changes
+      if (session?.user) {
+        const { data: userRoleData } = await supabase
+          .from('user_roles')
+          .select('role')
+          .eq('user_id', session.user.id)
+          .single();
+        
+        setUserRole(userRoleData?.role || 'user');
+      } else {
+        setUserRole('user');
+      }
+      
       setLoading(false);
     });
 
@@ -63,6 +90,20 @@ export function DashboardNav() {
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     window.location.href = '/';
+  };
+
+  // Get role display name
+  const getRoleDisplayName = (role: string) => {
+    switch (role) {
+      case 'admin':
+        return 'Administrator';
+      case 'user':
+        return 'Korisnik';
+      case 'manager':
+        return 'Menadžer';
+      default:
+        return 'Korisnik';
+    }
   };
 
   // Check if we're on the landing page
@@ -125,7 +166,9 @@ export function DashboardNav() {
                   </div>
                   <div className="flex flex-col items-start">
                     <span className="text-sm font-medium">{user?.email}</span>
-                    <span className="text-xs text-gray-500 dark:text-gray-400">Administrator</span>
+                    <span className="text-xs text-gray-500 dark:text-gray-400">
+                      {getRoleDisplayName(userRole)}
+                    </span>
                   </div>
                   <ChevronDown className={`h-4 w-4 transition-transform ${isUserMenuOpen ? 'rotate-180' : ''}`} />
                 </button>
@@ -135,7 +178,7 @@ export function DashboardNav() {
                   <div className="absolute right-0 mt-2 w-56 bg-white dark:bg-gray-800 rounded-lg shadow-lg border border-gray-200 dark:border-gray-700 z-50">
                     <div className="p-2">
                       <div className="px-3 py-2 text-sm text-gray-500 dark:text-gray-400 border-b border-gray-200 dark:border-gray-600">
-                        Prijavljen kao
+                        Prijavljen kao {getRoleDisplayName(userRole)}
                       </div>
                       
                       <Link
@@ -261,7 +304,9 @@ export function DashboardNav() {
                         </div>
                         <div className="flex flex-col">
                           <span className="font-medium">{user?.email}</span>
-                          <span className="text-xs text-gray-500">Administrator</span>
+                          <span className="text-xs text-gray-500">
+                            {getRoleDisplayName(userRole)}
+                          </span>
                         </div>
                       </div>
                       <ThemeToggle />
